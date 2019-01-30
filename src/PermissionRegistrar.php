@@ -159,7 +159,8 @@ class PermissionRegistrar
     public function getKey(array $params): string
     {
         if ($params && self::$cacheIsTaggable) {
-            return self::$cacheKey.'.'.implode('.', array_values($params));
+            $key = [$params[0][2], $params[1][2]];
+            return self::$cacheKey.'.'.implode('.', $key);
         }
 
         return self::$cacheKey;
