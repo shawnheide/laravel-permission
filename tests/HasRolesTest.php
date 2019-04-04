@@ -29,6 +29,22 @@ class HasRolesTest extends TestCase
     }
 
     /** @test */
+    public function it_removes_a_role_and_returns_roles()
+    {
+        $this->testUser->assignRole('testRole');
+
+        $this->testUser->assignRole('testRole2');
+
+        $this->assertTrue($this->testUser->hasRole(['testRole', 'testRole2']));
+
+        $roles = $this->testUser->removeRole('testRole');
+
+        $this->assertFalse($roles->hasRole('testRole'));
+
+        $this->assertTrue($roles->hasRole('testRole2'));
+    }
+
+    /** @test */
     public function it_can_assign_and_remove_a_role_on_a_permission()
     {
         $this->testUserPermission->assignRole('testRole');
@@ -336,6 +352,32 @@ class HasRolesTest extends TestCase
 
         $this->assertEquals($scopedUsers1->count(), 1);
         $this->assertEquals($scopedUsers2->count(), 1);
+        $this->assertEquals($scopedUsers3->count(), 1);
+    }
+
+    /** @test */
+    public function it_can_scope_against_a_specific_guard()
+    {
+        $user1 = User::create(['email' => 'user1@test.com']);
+        $user2 = User::create(['email' => 'user2@test.com']);
+        $user1->assignRole('testRole');
+        $user2->assignRole('testRole2');
+
+        $scopedUsers1 = User::role('testRole', 'web')->get();
+
+        $this->assertEquals($scopedUsers1->count(), 1);
+
+        $user3 = Admin::create(['email' => 'user1@test.com']);
+        $user4 = Admin::create(['email' => 'user1@test.com']);
+        $user5 = Admin::create(['email' => 'user2@test.com']);
+        $testAdminRole2 = app(Role::class)->create(['name' => 'testAdminRole2', 'guard_name' => 'admin']);
+        $user3->assignRole($this->testAdminRole);
+        $user4->assignRole($this->testAdminRole);
+        $user5->assignRole($testAdminRole2);
+        $scopedUsers2 = Admin::role('testAdminRole', 'admin')->get();
+        $scopedUsers3 = Admin::role('testAdminRole2', 'admin')->get();
+
+        $this->assertEquals($scopedUsers2->count(), 2);
         $this->assertEquals($scopedUsers3->count(), 1);
     }
 

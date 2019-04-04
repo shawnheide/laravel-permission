@@ -7,14 +7,13 @@ use Spatie\Permission\Contracts\Role;
 use Illuminate\Support\Facades\Artisan;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Contracts\Permission;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
 class CacheTest extends TestCase
 {
     protected $cache_init_count = 0;
     protected $cache_load_count = 0;
-    protected $cache_run_count = 2;
-    protected $cache_reload_count = 0;
-    protected $cache_untagged_count = 0;
+    protected $cache_run_count = 2; // roles lookup, permissions lookup
     protected $cache_relations_count = 1;
 
     protected $registrar;
@@ -35,20 +34,6 @@ class CacheTest extends TestCase
             case $cacheStore instanceof \Illuminate\Cache\DatabaseStore:
                 $this->cache_init_count = 1;
                 $this->cache_load_count = 1;
-                $this->cache_reload_count = 1;
-                $this->cache_untagged_count = -1;
-                break;
-            case $cacheStore instanceof \Illuminate\Cache\FileStore:
-                $this->cache_untagged_count = -2;
-                break;
-            case $cacheStore instanceof \Illuminate\Cache\RedisStore:
-                $this->cache_untagged_count = 0;
-                break;
-            case $cacheStore instanceof \Illuminate\Cache\MemcachedStore:
-                $this->cache_untagged_count = 0;
-                break;
-            case $cacheStore instanceof \Illuminate\Cache\ArrayStore:
-                $this->cache_untagged_count = 0;
             default:
         }
     }
@@ -61,10 +46,6 @@ class CacheTest extends TestCase
         $this->registrar->getPermissions();
 
         $this->assertQueryCount($this->cache_init_count + $this->cache_load_count + $this->cache_run_count);
-
-        $this->registrar->getPermissions();
-
-        $this->assertQueryCount($this->cache_init_count + $this->cache_load_count + $this->cache_run_count + $this->cache_reload_count);
     }
 
     /** @test */
@@ -132,7 +113,8 @@ class CacheTest extends TestCase
 
         $this->registrar->getPermissions();
 
-        $this->assertQueryCount($this->cache_init_count);
+        // should all be in memory, so no init/load required
+        $this->assertQueryCount(0);
     }
 
     /** @test */
@@ -150,7 +132,7 @@ class CacheTest extends TestCase
     /** @test */
     public function has_permission_to_should_use_the_cache()
     {
-        $this->testUserRole->givePermissionTo(['edit-articles', 'edit-news']);
+        $this->testUserRole->givePermissionTo(['edit-articles', 'edit-news', 'Edit News']);
         $this->testUser->assignRole('testRole');
 
         $this->resetQueryCount();
@@ -159,11 +141,32 @@ class CacheTest extends TestCase
 
         $this->resetQueryCount();
         $this->assertTrue($this->testUser->hasPermissionTo('edit-news'));
-        $this->assertQueryCount($this->cache_run_count + $this->cache_untagged_count);
+        $this->assertQueryCount(0);
 
         $this->resetQueryCount();
         $this->assertTrue($this->testUser->hasPermissionTo('edit-articles'));
-        $this->assertQueryCount($this->cache_init_count);
+        $this->assertQueryCount(0);
+
+        $this->resetQueryCount();
+        $this->assertTrue($this->testUser->hasPermissionTo('Edit News'));
+        $this->assertQueryCount(0);
+    }
+
+    /** @test */
+    public function the_cache_should_differentiate_by_guard_name()
+    {
+        $this->expectException(PermissionDoesNotExist::class);
+
+        $this->testUserRole->givePermissionTo(['edit-articles', 'web']);
+        $this->testUser->assignRole('testRole');
+
+        $this->resetQueryCount();
+        $this->assertTrue($this->testUser->hasPermissionTo('edit-articles', 'web'));
+        $this->assertQueryCount($this->cache_init_count + $this->cache_load_count + $this->cache_run_count + $this->cache_relations_count);
+
+        $this->resetQueryCount();
+        $this->assertFalse($this->testUser->hasPermissionTo('edit-articles', 'admin'));
+        $this->assertQueryCount(1); // 1 for first lookup of this permission with this guard
     }
 
     /** @test */
