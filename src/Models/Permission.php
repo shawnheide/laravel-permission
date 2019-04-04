@@ -87,7 +87,6 @@ class Permission extends Model implements PermissionContract
     public static function findByName(string $name, $guardName = null): PermissionContract
     {
         $guardName = $guardName ?? Guard::getDefaultName(static::class);
-        $name = str_replace('*', '%', $name);
         $permission = static::getPermissions([['name', 'like', $name], ['guard_name', 'like', $guardName]])->first();
         if (! $permission) {
             throw PermissionDoesNotExist::create($name, $guardName);
