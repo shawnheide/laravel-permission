@@ -138,9 +138,9 @@ class PermissionRegistrar
         $permissions = clone $this->permissions;
 
         foreach ($params as $attr => $value) {
-            if (count($value) == 3) {
-                $permissions = $permissions->filter(function ($permission) use ($value) {
-                    return preg_match("/{$value[2]}/", $permission->{$value[0]});
+            if (strpos($value, '*') !== false) {
+                $permissions = $permissions->filter(function ($permission) use ($attr, $value) {
+                    return preg_match("/{$value}/", $permission->{$attr});
                 });
             } else {
                 $permissions = $permissions->where($attr, $value);
